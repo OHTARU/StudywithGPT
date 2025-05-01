@@ -16,8 +16,13 @@ const io = new Server(server, {
     }
 });
 
+const PORT = process.env.PORT || 3000;
+const CORS_ORIGIN = process.env.NODE_ENV === 'production' 
+    ? 'https://studywithgpt.onrender.com'
+    : '*';
+
 app.use(cors({
-    origin: "*",
+    origin: CORS_ORIGIN,
     credentials: true
 }));
 app.use(bodyParser.json());
@@ -111,7 +116,6 @@ setInterval(() => {
     }
 }, 60000); // 1분마다 체크
 
-const PORT = 3000;
 server.listen(PORT, () => {
     console.log(`서버 실행 중: http://localhost:${PORT}`);
 });
