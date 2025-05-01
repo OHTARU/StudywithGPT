@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=850, height=500, maximum-scale=1.0, user-scalable=no">
+    <title>사과 게임</title>
+    <style>
+        :root {
+            --primary-color: #ff6b6b;
+            --secondary-color: #4ecdc4;
+            --background-color: #f7f7f7;
+            --text-color: #2d3436;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--background-color);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+            min-height: 100vh;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 850px;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: auto;
+            border-radius: 15px;
+            background: white;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease;
+            touch-action: none;
+        }
+
+        .side-panel {
+            width: 300px;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            height: fit-content;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: var(--primary-color);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        #startButton {
+            padding: 12px 30px;
+            font-size: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+
+        #startButton:hover {
+            background-color: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        .player-list h2, .record-list h2 {
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--secondary-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        .player-item, .record-item {
+            background: var(--background-color);
+            padding: 12px 15px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border-left: 4px solid var(--secondary-color);
+            transition: transform 0.2s ease;
+        }
+
+        #timer, #score {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+            margin: 15px 0;
+            text-align: center;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            width: calc(100% - 40px);
+        }
+
+        @media (max-width: 1200px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+                padding: 0 20px;
+            }
+
+            .side-panel {
+                width: 100%;
+                max-width: 850px;
+                margin-top: 20px;
+            }
+
+            .game-area {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 2em;
+                margin: 10px 0;
+            }
+
+            #startButton {
+                width: 80%;
+                max-width: 300px;
+                font-size: 18px;
+                padding: 10px 20px;
+            }
+
+            #timer, #score {
+                font-size: 18px;
+                padding: 8px 15px;
+            }
+
+            .side-panel {
+                padding: 15px;
+            }
+
+            .player-item, .record-item {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        }
+
+        @media (hover: none) {
+            #gameCanvas:hover {
+                transform: none;
+            }
+
+            .player-item:hover, .record-item:hover {
+                transform: none;
+            }
+
+            #startButton:hover {
+                transform: none;
+                background-color: var(--primary-color);
+            }
+        }
+
+        .current-player {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .player-item, .record-item {
+            animation: fadeIn 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>사과 게임</h1>
+    <button id="startButton">게임 시작</button>
+    <div class="game-container">
+        <div class="game-area">
+            <canvas id="gameCanvas" width="850" height="500"></canvas>
+            <div id="score">점수: 0</div>
+            <div id="timer">남은 시간: 120초</div>
+        </div>
+        <div class="side-panel">
+            <div class="player-list">
+                <h2>게임 중인 플레이어</h2>
+                <div id="playerList"></div>
+            </div>
+            <div class="record-list">
+                <h2>게임 기록</h2>
+                <div id="recordList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        // 전역 변수 설정
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDragging = false;
+        let dragStartX, dragStartY, dragEndX, dragEndY;
+        let gameStarted = false;
+        let score = 0;
+        let timeLeft = 120;
+        let playerName = "";
+
+        const socket = io('http://localhost:3000');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const startButton = document.getElementById('startButton');
+        const playerList = document.getElementById('playerList');
+        const recordList = document.getElementById('recordList');
+
+        const rows = 10;
+        const cols = 17;
+        const appleSize = 40;
+        const apples = [];
+
+        // 성능 최적화를 위한 캔버스 버퍼링
+        const buffer = document.createElement('canvas');
+        buffer.width = canvas.width;
+        buffer.height = canvas.height;
+        const bufferCtx = buffer.getContext('2d');
+
+        function loadRecords() {
+            fetch('http://localhost:3000/records')
+                .then(response => response.json())
+                .then(data => {
+                    recordList.innerHTML = "";
+                    data.forEach(record => {
+                        const div = document.createElement('div');
+                        div.className = 'record-item';
+                        div.textContent = `${record.name}: ${record.score}점 (${record.date})`;
+                        recordList.appendChild(div);
+                    });
+                });
+        }
+
+        socket.on('connect', () => {
+            console.log('서버에 연결됨');
+            socketConnected = true;
+            if (gameStarted) {
+                socket.emit('startGame', { name: playerName, score: score });
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log('서버 연결 끊김');
+            socketConnected = false;
+        });
+
+        socket.on('updatePlayers', (players) => {
+            playerList.innerHTML = "";
+            if (Object.keys(players).length > 0) {
+                Object.entries(players).forEach(([id, player]) => {
+                    const div = document.createElement('div');
+                    div.className = 'player-item';
+                    if (player.name === playerName) {
+                        div.classList.add('current-player');
+                    }
+                    const status = player.gameStarted ? '게임 중' : '대기 중';
+                    div.textContent = `${player.name}: ${player.score}점 (${status})`;
+                    playerList.appendChild(div);
+                });
+            } else {
+                const div = document.createElement('div');
+                div.className = 'player-item';
+                div.textContent = '접속한 플레이어가 없습니다.';
+                playerList.appendChild(div);
+            }
+        });
+
+        function initializeApples() {
+            apples.length = 0;
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    apples.push({
+                        x: col * appleSize,
+                        y: row * appleSize,
+                        value: Math.floor(Math.random() * 9) + 1,
+                        visible: true
+                    });
+                }
+            }
+        }
+
+        function startTimer() {
+            const timerInterval = setInterval(() => {
+                if (!gameStarted) return;
+                timeLeft--;
+                timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    gameStarted = false;
+                    
+                    fetch('http://localhost:3000/records', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: playerName,
+                            score: score
+                        })
+                    }).then(() => {
+                        alert(`게임 종료! 최종 점수: ${score}`);
+                        loadRecords();
+                    });
+                }
+            }, 1000);
+        }
+
+        // 마우스 이벤트 핸들러 수정
+        function getCanvasPosition(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        // mousedown 이벤트 수정
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameStarted) return;
+            const pos = getCanvasPosition(e.clientX, e.clientY);
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            dragEndX = pos.x;  // 초기 dragEnd 위치 설정
+            dragEndY = pos.y;
+            isDragging = true;
+        });
+
+        // mousemove 이벤트 수정
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging || !gameStarted) return;
+            const pos = getCanvasPosition(e.clientX, e.clientY);
+            dragEndX = pos.x;
+            dragEndY = pos.y;
+        });
+
+        // mouseup 이벤트 수정
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDragging || !gameStarted) return;
+            
+            const selectedApples = apples.filter(apple => {
+                if (!apple.visible) return false;
+                const boxLeft = Math.min(dragStartX, dragEndX);
+                const boxRight = Math.max(dragStartX, dragEndX);
+                const boxTop = Math.min(dragStartY, dragEndY);
+                const boxBottom = Math.max(dragStartY, dragEndY);
+                
+                const appleCenterX = apple.x + appleSize / 2;
+                const appleCenterY = apple.y + appleSize / 2;
+                
+                return appleCenterX >= boxLeft && appleCenterX <= boxRight &&
+                       appleCenterY >= boxTop && appleCenterY <= boxBottom;
+            });
+
+            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
+            if (sum === 10) {
+                removeApples(selectedApples);
+            }
+            
+            isDragging = false;
+            dragStartX = undefined;
+            dragStartY = undefined;
+            dragEndX = undefined;
+            dragEndY = undefined;
+        });
+
+        // mouseleave 이벤트 추가
+        canvas.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                dragStartX = undefined;
+                dragStartY = undefined;
+                dragEndX = undefined;
+                dragEndY = undefined;
+                clearCanvas();
+                drawApples();
+            }
+        });
+
+        function updateGame() {
+            if (!gameStarted) return;
+            
+            clearCanvas();
+            drawApples();
+            if (isDragging) {
+                drawDragBox();
+            }
+            requestAnimationFrame(updateGame);
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawApples() {
+            bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            apples.forEach(apple => {
+                if (apple.visible) {
+                    const centerX = apple.x + appleSize / 2;
+                    const centerY = apple.y + appleSize / 2;
+                    
+                    // 사과 그리기를 최적화
+                    bufferCtx.fillStyle = 'red';
+                    bufferCtx.beginPath();
+                    bufferCtx.arc(centerX, centerY, appleSize/2 - 5, 0, Math.PI * 2);
+                    bufferCtx.fill();
+                    
+                    // 텍스트 그리기 최적화
+                    bufferCtx.fillStyle = 'white';
+                    bufferCtx.font = '16px Arial';
+                    bufferCtx.textAlign = 'center';
+                    bufferCtx.textBaseline = 'middle';
+                    bufferCtx.fillText(apple.value.toString(), centerX, centerY);
+                }
+            });
+            
+            // 버퍼를 메인 캔버스에 한 번에 복사
+            ctx.drawImage(buffer, 0, 0);
+        }
+
+        function calculateSum(selectedApples) {
+            // 선택된 사과들의 값만 더하기
+            return selectedApples.reduce((sum, apple) => {
+                return sum + (apple.visible ? apple.value : 0);
+            }, 0);
+        }
+
+        // drawDragBox 함수 수정
+        function drawDragBox() {
+            if (!isDragging || dragStartX === undefined || dragEndX === undefined) return;
+            
+            ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
+            ctx.fillStyle = 'rgba(0, 0, 255, 0.1)';
+            ctx.lineWidth = 2;
+            
+            const x = Math.min(dragStartX, dragEndX);
+            const y = Math.min(dragStartY, dragEndY);
+            const width = Math.abs(dragEndX - dragStartX);
+            const height = Math.abs(dragEndY - dragStartY);
+            
+            // 드래그 박스가 너무 작은 경우 그리지 않음
+            if (width < 5 || height < 5) return;
+            
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x, y, width, height);
+            
+            // 선택된 사과들의 합 표시
+            const selectedApples = apples.filter(apple => {
+                if (!apple.visible) return false;
+                const appleCenterX = apple.x + appleSize / 2;
+                const appleCenterY = apple.y + appleSize / 2;
+                
+                return appleCenterX >= x && appleCenterX <= x + width &&
+                       appleCenterY >= y && appleCenterY <= y + height;
+            });
+            
+            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
+            
+            // 합계 표시
+            ctx.fillStyle = sum === 10 ? '#4CAF50' : 'black';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`합계: ${sum}`, x + width / 2, y - 5);
+        }
+
+        // 사과 제거 애니메이션 최적화
+        function removeApples(selectedApples) {
+            const ANIMATION_DURATION = 200; // 더 빠른 애니메이션
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+                
+                clearCanvas();
+                drawApples();
+                
+                // 선택된 사과 하이라이트 효과
+                selectedApples.forEach(apple => {
+                    const centerX = apple.x + appleSize / 2;
+                    const centerY = apple.y + appleSize / 2;
+                    
+                    ctx.fillStyle = `rgba(255, 0, 0, ${0.3 * (1 - progress)})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, appleSize/2 * (1 - progress/2), 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    selectedApples.forEach(apple => apple.visible = false);
+                    updateScore(score + selectedApples.length);
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        function updateScore(newScore) {
+            score = newScore;
+            scoreDisplay.textContent = `점수: ${score}`;
+            if (socketConnected) {
+                socket.emit('updateScore', { 
+                    score: score,
+                    name: playerName
+                });
+            }
+        }
+
+        function endGame() {
+            gameStarted = false;
+            if (socketConnected) {
+                socket.emit('endGame', { name: playerName });
+            }
+            fetch('http://localhost:3000/records', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: playerName,
+                    score: score
+                })
+            }).then(() => {
+                alert(`게임 종료! 최종 점수: ${score}`);
+                loadRecords();
+            });
+        }
+
+        startButton.addEventListener('click', () => {
+            if (!gameStarted) {
+                playerName = prompt("사용자 이름을 입력하세요:");
+                if (!playerName) {
+                    alert("이름을 입력해야 게임을 시작할 수 있습니다.");
+                    return;
+                }
+                
+                gameStarted = true;
+                timeLeft = 120;
+                score = 0;
+                isDragging = false; // 드래그 상태 초기화
+                dragStartX = dragStartY = dragEndX = dragEndY = undefined;
+                
+                scoreDisplay.textContent = `점수: ${score}`;
+                timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
+                
+                initializeApples();
+                socket.emit('startGame', { name: playerName, score: 0 });
+                startTimer();
+                updateGame();
+            }
+        });
+
+        window.onload = () => {
+            clearCanvas();
+            loadRecords();
+        };
+
+        // 터치 이벤트 지원
+        let isTouching = false;
+
+        // 터치 이벤트 핸들러 수정
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameStarted) return;
+            const touch = e.touches[0];
+            const pos = getCanvasPosition(touch.clientX, touch.clientY);
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            isDragging = true;
+            isTouching = true;
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDragging || !gameStarted) return;
+            const touch = e.touches[0];
+            const pos = getCanvasPosition(touch.clientX, touch.clientY);
+            dragEndX = pos.x;
+            dragEndY = pos.y;
+            requestAnimationFrame(() => {
+                clearCanvas();
+                drawApples();
+                drawDragBox();
+            });
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!isDragging || !gameStarted) return;
+            
+            const selectedApples = apples.filter(apple => {
+                if (!apple.visible) return false;
+                return isAppleInBox(apple, {
+                    startX: dragStartX,
+                    startY: dragStartY,
+                    endX: dragEndX,
+                    endY: dragEndY
+                });
+            });
+
+            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
+            
+            if (sum === 10) {
+                removeApples(selectedApples);
+            }
+            
+            isDragging = false;
+            isTouching = false;
+            dragStartX = dragStartY = dragEndX = dragEndY = undefined;
+        }, { passive: false });
+
+        // 터치 취소 처리
+        canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            isDragging = false;
+            isTouching = false;
+            dragStartX = dragStartY = dragEndX = dragEndY = undefined;
+            
+            clearCanvas();
+            drawApples();
+        }, { passive: false });
+
+        // 모바일에서 더블탭 줌 방지
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // 화면 크기 변경 시 캔버스 조정
+        window.addEventListener('resize', () => {
+            if (gameStarted) {
+                clearCanvas();
+                drawApples();
+            }
+        });
+    </script>
+</body>
+</html>
