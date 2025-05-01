@@ -23,6 +23,7 @@
             padding: 20px;
             color: var(--text-color);
             min-height: 100vh;
+            overscroll-behavior: none;
         }
 
         .game-container {
@@ -50,6 +51,13 @@
             box-shadow: var(--shadow);
             transition: transform 0.3s ease;
             touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .side-panel {
@@ -217,7 +225,43 @@
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socketConnected = false;
+        const serverUrl = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000'
+            : 'https://studywithgpt.onrender.com';
+    
+        const socket = io(serverUrl, {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+    
+        // 소켓 연결 상태 확인
+        socket.on('connect', () => {
+            console.log('서버에 연결됨');
+            socketConnected = true;
+            // 연결 즉시 기록 로드
+            loadRecords();
+        });
+    
+        socket.on('disconnect', () => {
+            console.log('서버 연결 끊김');
+            socketConnected = false;
+        });
+        socket.on('disconnect', () => {
+            console.log('서버 연결 끊김');
+            socketConnected = false;
+        });
+
+        // 1분마다 기록 갱신
+        // 1분마다 기록 갱신
+        setInterval(() => {
+            if (socketConnected) {
+                loadRecords();
+            }
+        }, 60000);
+    </script>
     <script>
         // 전역 변수 설정
         const canvas = document.getElementById('gameCanvas');
@@ -228,14 +272,6 @@
         let score = 0;
         let timeLeft = 120;
         let playerName = "";
-
-        const serverUrl = window.location.hostname === 'localhost'
-            ? 'http://localhost:3000'
-            : 'https://studywithgpt.onrender.com';  // 백엔드 서버 URL
-
-        const socket = io(serverUrl, {
-            withCredentials: true
-        });
 
         const scoreDisplay = document.getElementById('score');
         const timerDisplay = document.getElementById('timer');
@@ -255,52 +291,61 @@
         const bufferCtx = buffer.getContext('2d');
 
         function loadRecords() {
-            fetch('http://localhost:3000/records')
-                .then(response => response.json())
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000'
+                : 'https://studywithgpt.onrender.com';
+
+            fetch(`${apiUrl}/records`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('서버 응답 오류');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     recordList.innerHTML = "";
-                    data.forEach(record => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        data.sort((a, b) => b.score - a.score);  // 높은 점수순으로 정렬
+                        data.forEach(record => {
+                            const div = document.createElement('div');
+                            div.className = 'record-item';
+                            div.textContent = `${record.name}: ${record.score}점 (${new Date(record.date).toLocaleString()})`;
+                            recordList.appendChild(div);
+                        });
+                    } else {
                         const div = document.createElement('div');
                         div.className = 'record-item';
-                        div.textContent = `${record.name}: ${record.score}점 (${record.date})`;
+                        div.textContent = '아직 기록이 없습니다.';
                         recordList.appendChild(div);
-                    });
+                    }
+                })
+                .catch(error => {
+                    console.error('기록 로드 실패:', error);
+                    recordList.innerHTML = '<div class="record-item error">기록을 불러올 수 없습니다.</div>';
                 });
-        }
-
-        socket.on('connect', () => {
-            console.log('서버에 연결됨');
-            socketConnected = true;
-            if (gameStarted) {
-                socket.emit('startGame', { name: playerName, score: score });
             }
-        });
 
-        socket.on('disconnect', () => {
-            console.log('서버 연결 끊김');
-            socketConnected = false;
-        });
-
-        socket.on('updatePlayers', (players) => {
-            playerList.innerHTML = "";
-            if (Object.keys(players).length > 0) {
-                Object.entries(players).forEach(([id, player]) => {
+            socket.on('updatePlayers', (players) => {
+                playerList.innerHTML = "";
+                const playerArray = Array.isArray(players) ? players : Object.values(players);
+                
+                if (playerArray.length > 0) {
+                    playerArray.forEach(player => {
+                        const div = document.createElement('div');
+                        div.className = 'player-item';
+                        if (player.name === playerName) {
+                            div.classList.add('current-player');
+                        }
+                        div.textContent = `${player.name}: ${player.score}점`;
+                        playerList.appendChild(div);
+                    });
+                } else {
                     const div = document.createElement('div');
                     div.className = 'player-item';
-                    if (player.name === playerName) {
-                        div.classList.add('current-player');
-                    }
-                    const status = player.gameStarted ? '게임 중' : '대기 중';
-                    div.textContent = `${player.name}: ${player.score}점 (${status})`;
+                    div.textContent = '접속한 플레이어가 없습니다.';
                     playerList.appendChild(div);
-                });
-            } else {
-                const div = document.createElement('div');
-                div.className = 'player-item';
-                div.textContent = '접속한 플레이어가 없습니다.';
-                playerList.appendChild(div);
-            }
-        });
+                }
+            });
 
         function initializeApples() {
             apples.length = 0;
@@ -341,6 +386,94 @@
                     });
                 }
             }, 1000);
+        }
+
+        // 터치 이벤트 핸들러 추가 및 수정
+        function getCanvasPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            // 터치 이벤트인 경우
+            if (e.touches) {
+                return {
+                    x: (e.touches[0].clientX - rect.left) * scaleX,
+                    y: (e.touches[0].clientY - rect.top) * scaleY
+                };
+            }
+            
+            // 마우스 이벤트인 경우
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        // 터치 이벤트 리스너
+        canvas.addEventListener('touchstart', handleStart, { passive: false });
+        canvas.addEventListener('touchmove', handleMove, { passive: false });
+        canvas.addEventListener('touchend', handleEnd, { passive: false });
+        canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+
+        function handleStart(e) {
+            e.preventDefault();
+            if (!gameStarted) return;
+            
+            const pos = getCanvasPosition(e);
+            isDragging = true;
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            dragEndX = pos.x;
+            dragEndY = pos.y;
+        }
+
+        function handleMove(e) {
+            e.preventDefault();
+            if (!isDragging || !gameStarted) return;
+            
+            const pos = getCanvasPosition(e);
+            dragEndX = pos.x;
+            dragEndY = pos.y;
+            
+            requestAnimationFrame(() => {
+                clearCanvas();
+                drawApples();
+                drawDragBox();
+            });
+        }
+
+        function handleEnd(e) {
+            e.preventDefault();
+            if (!isDragging || !gameStarted) return;
+            
+            const selectedApples = apples.filter(apple => {
+                if (!apple.visible) return false;
+                
+                const boxLeft = Math.min(dragStartX, dragEndX);
+                const boxRight = Math.max(dragStartX, dragEndX);
+                const boxTop = Math.min(dragStartY, dragEndY);
+                const boxBottom = Math.max(dragStartY, dragEndY);
+                
+                const appleCenterX = apple.x + appleSize / 2;
+                const appleCenterY = apple.y + appleSize / 2;
+                
+                return appleCenterX >= boxLeft && appleCenterX <= boxRight &&
+                       appleCenterY >= boxTop && appleCenterY <= boxBottom;
+            });
+            
+            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
+            if (sum === 10) {
+                removeApples(selectedApples);
+            }
+            
+            isDragging = false;
+            dragStartX = undefined;
+            dragStartY = undefined;
+            dragEndX = undefined;
+            dragEndY = undefined;
+            
+            clearCanvas();
+            drawApples();
         }
 
         // 마우스 이벤트 핸들러 수정
@@ -569,29 +702,33 @@
             });
         }
 
-        startButton.addEventListener('click', () => {
-            if (!gameStarted) {
-                playerName = prompt("사용자 이름을 입력하세요:");
-                if (!playerName) {
-                    alert("이름을 입력해야 게임을 시작할 수 있습니다.");
-                    return;
-                }
-                
-                gameStarted = true;
-                timeLeft = 120;
-                score = 0;
-                isDragging = false; // 드래그 상태 초기화
-                dragStartX = dragStartY = dragEndX = dragEndY = undefined;
-                
-                scoreDisplay.textContent = `점수: ${score}`;
-                timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
-                
-                initializeApples();
-                socket.emit('startGame', { name: playerName, score: 0 });
-                startTimer();
-                updateGame();
+            startButton.addEventListener('click', () => {
+        if (!gameStarted) {
+            playerName = prompt("사용자 이름을 입력하세요:");
+            if (!playerName) {
+                alert("이름을 입력해야 게임을 시작할 수 있습니다.");
+                return;
             }
-        });
+            
+            gameStarted = true;
+            timeLeft = 120;
+            score = 0;
+            
+            scoreDisplay.textContent = `점수: ${score}`;
+            timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
+            
+            initializeApples();
+            if (socketConnected) {
+                socket.emit('startGame', { 
+                    name: playerName, 
+                    score: 0,
+                    timestamp: Date.now()
+                });
+            }
+            startTimer();
+            updateGame();
+        }
+    });
 
         window.onload = () => {
             clearCanvas();
