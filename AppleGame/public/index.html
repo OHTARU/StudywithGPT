@@ -7,22 +7,30 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-  <div class="sidebar">
-    <div class="info-box">
-      <h3>🔢 점수 &amp; 시간</h3>
-      <div id="score">점수: 0</div>
-      <div id="timer">남은 시간: 120초</div>
-      <button id="startButton">게임 시작</button>
+  <div class="container">
+
+    <!-- 게임 영역 -->
+    <div class="game-wrapper">
+      <canvas id="gameCanvas" width="850" height="650"></canvas>
     </div>
-    <div class="info-box">
-      <h3>🏆 기록</h3>
-      <div id="recordList"></div>
-    </div>
-    <div class="info-box">
-      <h3>👥 플레이어</h3>
-      <div id="playerList"></div>
-    </div>
+
+    <!-- 사이드바 -->
+    <aside class="sidebar">
+      <div class="panel controls">
+        <div id="score">점수: 0</div>
+        <div id="timer">남은 시간: 120초</div>
+        <button id="startButton">게임 시작</button>
+      </div>
+      <div class="panel records">
+        <h3>🏆 기록</h3>
+        <div id="recordList">불러오는 중…</div>
+      </div>
+      <div class="panel players">
+        <h3>👥 플레이어</h3>
+        <div id="playerList">불러오는 중…</div>
+      </div>
+    </aside>
+
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
