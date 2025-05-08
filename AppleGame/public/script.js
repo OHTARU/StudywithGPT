@@ -141,7 +141,7 @@ let socketConnected = false;
                     clearInterval(timerInterval);
                     gameStarted = false;
                     
-                    fetch('http://localhost:3000/records', {
+                    fetch(`${serverUrl}/records`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -247,7 +247,7 @@ let socketConnected = false;
         }
 
         // 마우스 이벤트 핸들러 수정
-        function getCanvasPosition(clientX, clientY) {
+        function getCanvasPositionFromCoords(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
@@ -260,7 +260,7 @@ let socketConnected = false;
         // mousedown 이벤트 수정
         canvas.addEventListener('mousedown', (e) => {
             if (!gameStarted) return;
-            const pos = getCanvasPosition(e.clientX, e.clientY);
+            const pos = getCanvasPositionFromCoords(e.clientX, e.clientY);
             dragStartX = pos.x;
             dragStartY = pos.y;
             dragEndX = pos.x;  // 초기 dragEnd 위치 설정
@@ -271,7 +271,7 @@ let socketConnected = false;
         // mousemove 이벤트 수정
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging || !gameStarted) return;
-            const pos = getCanvasPosition(e.clientX, e.clientY);
+            const pos = getCanvasPositionFromCoords(e.clientX, e.clientY);
             dragEndX = pos.x;
             dragEndY = pos.y;
         });
@@ -457,7 +457,7 @@ let socketConnected = false;
             if (socketConnected) {
                 socket.emit('endGame', { name: playerName });
             }
-            fetch('http://localhost:3000/records', {
+            fetch(`${serverUrl}/records`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -582,3 +582,15 @@ let socketConnected = false;
                 drawApples();
             }
         });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/service-worker.js')
+                .then(function(reg) {
+                  console.log('Service Worker 등록 성공:', reg.scope);
+                })
+                .catch(function(err) {
+                  console.log('Service Worker 등록 실패:', err);
+                });
+            });
+          }
