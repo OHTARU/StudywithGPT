@@ -3,10 +3,10 @@ let socketConnected = false;
             ? 'http://localhost:3000'
             : 'https://studywithgpt.onrender.com';
     
-        const socket = io(serverUrl, {
-            withCredentials: true,
-            transports: ['websocket', 'polling']
-        });
+            const socket = io(serverUrl, {
+                withCredentials: true,
+                transports: ['websocket', 'polling']
+            });
     
         // 소켓 연결 상태 확인
         socket.on('connect', () => {
