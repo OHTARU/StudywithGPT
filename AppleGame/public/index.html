@@ -1,35 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=850, height=500, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#ff6b6b">
-    <title>사과 게임</title>
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>사과 게임</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>사과 게임</h1>
-    <button id="startButton">게임 시작</button>
-    <div class="game-container">
-        <div class="game-area">
-            <canvas id="gameCanvas" width="850" height="500"></canvas>
-            <div id="score">점수: 0</div>
-            <div id="timer">남은 시간: 120초</div>
-        </div>
-        <div class="side-panel">
-            <div class="player-list">
-                <h2>게임 중인 플레이어</h2>
-                <div id="playerList"></div>
-            </div>
-            <div class="record-list">
-                <h2>게임 기록</h2>
-                <div id="recordList"></div>
-            </div>
-        </div>
+  <canvas id="gameCanvas"></canvas>
+  <div class="sidebar">
+    <div class="info-box">
+      <h3>🔢 점수 &amp; 시간</h3>
+      <div id="score">점수: 0</div>
+      <div id="timer">남은 시간: 120초</div>
+      <button id="startButton">게임 시작</button>
     </div>
+    <div class="info-box">
+      <h3>🏆 기록</h3>
+      <div id="recordList"></div>
+    </div>
+    <div class="info-box">
+      <h3>👥 플레이어</h3>
+      <div id="playerList"></div>
+    </div>
+  </div>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="script.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

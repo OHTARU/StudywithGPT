@@ -1,593 +1,320 @@
+// ── 설정 ──
+const rows = 10, cols = 12;
 let socketConnected = false;
-        const serverUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3000'
-            : 'https://studywithgpt.onrender.com';
-    
-            const socket = io(serverUrl, {
-                withCredentials: true,
-                transports: ['websocket', 'polling']
-            });
-    
-        // 소켓 연결 상태 확인
-        socket.on('connect', () => {
-            console.log('서버에 연결됨');
-            socketConnected = true;
-            // 연결 즉시 기록 로드
-            loadRecords();
-        });
-    
-        socket.on('disconnect', () => {
-            console.log('서버 연결 끊김');
-            socketConnected = false;
-        });
-        socket.on('disconnect', () => {
-            console.log('서버 연결 끊김');
-            socketConnected = false;
-        });
+let gameStarted = false, score = 0, timeLeft = 120, playerName = "";
+const serverUrl = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000' : 'https://studywithgpt.onrender.com';
+const socket = io(serverUrl, {
+  withCredentials: true,
+  transports: ['websocket','polling']
+});
 
-        // 1분마다 기록 갱신
-        // 1분마다 기록 갱신
-        setInterval(() => {
-            if (socketConnected) {
-                loadRecords();
-            }
-        }, 60000);
+// ── DOM ──
+const canvas       = document.getElementById('gameCanvas');
+const ctx          = canvas.getContext('2d');
+const scoreDisplay = document.getElementById('score');
+const timerDisplay = document.getElementById('timer');
+const startButton  = document.getElementById('startButton');
+const recordList   = document.getElementById('recordList');
+const playerList   = document.getElementById('playerList');
 
-// 전역 변수 설정
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        let isDragging = false;
-        let dragStartX, dragStartY, dragEndX, dragEndY;
-        let gameStarted = false;
-        let score = 0;
-        let timeLeft = 120;
-        let playerName = "";
+// 캔버스 크기
+canvas.width  = canvas.clientWidth;
+canvas.height = canvas.clientHeight;
 
-        const scoreDisplay = document.getElementById('score');
-        const timerDisplay = document.getElementById('timer');
-        const startButton = document.getElementById('startButton');
-        const playerList = document.getElementById('playerList');
-        const recordList = document.getElementById('recordList');
+// 버퍼캔버스
+const buffer    = document.createElement('canvas');
+buffer.width   = canvas.width;
+buffer.height  = canvas.height;
+const bufferCtx = buffer.getContext('2d');
 
-        const rows = 10;
-        const cols = 17;
-        const appleSize = 40;
-        const apples = [];
+// 드래그 상태
+let isDragging = false, dragStartX, dragStartY, dragEndX, dragEndY;
 
-        // 성능 최적화를 위한 캔버스 버퍼링
-        const buffer = document.createElement('canvas');
-        buffer.width = canvas.width;
-        buffer.height = canvas.height;
-        const bufferCtx = buffer.getContext('2d');
+// 사과 배열
+let apples = [];
 
-        function loadRecords() {
-            const apiUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:3000'
-                : 'https://studywithgpt.onrender.com';
+// ── 소켓 이벤트 ──
+socket.on('connect', () => {
+  socketConnected = true;
+  loadRecords();
+});
+socket.on('disconnect', () => {
+  socketConnected = false;
+});
+setInterval(() => {
+  if (socketConnected) loadRecords();
+}, 60000);
 
-            fetch(`${apiUrl}/records`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('서버 응답 오류');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    recordList.innerHTML = "";
-                    if (Array.isArray(data) && data.length > 0) {
-                        data.sort((a, b) => b.score - a.score);  // 높은 점수순으로 정렬
-                        data.forEach(record => {
-                            const div = document.createElement('div');
-                            div.className = 'record-item';
-                            div.textContent = `${record.name}: ${record.score}점 (${new Date(record.date).toLocaleString()})`;
-                            recordList.appendChild(div);
-                        });
-                    } else {
-                        const div = document.createElement('div');
-                        div.className = 'record-item';
-                        div.textContent = '아직 기록이 없습니다.';
-                        recordList.appendChild(div);
-                    }
-                })
-                .catch(error => {
-                    console.error('기록 로드 실패:', error);
-                    recordList.innerHTML = '<div class="record-item error">기록을 불러올 수 없습니다.</div>';
-                });
-            }
-
-            socket.on('updatePlayers', (players) => {
-                playerList.innerHTML = "";
-                const playerArray = Array.isArray(players) ? players : Object.values(players);
-                
-                if (playerArray.length > 0) {
-                    playerArray.forEach(player => {
-                        const div = document.createElement('div');
-                        div.className = 'player-item';
-                        if (player.name === playerName) {
-                            div.classList.add('current-player');
-                        }
-                        div.textContent = `${player.name}: ${player.score}점`;
-                        playerList.appendChild(div);
-                    });
-                } else {
-                    const div = document.createElement('div');
-                    div.className = 'player-item';
-                    div.textContent = '접속한 플레이어가 없습니다.';
-                    playerList.appendChild(div);
-                }
-            });
-
-        function initializeApples() {
-    apples.length = 0;
-    const padding = 10;
-    const appleSize = Math.min(
-        (canvas.width - (cols + 1) * padding) / cols,
-        (canvas.height - (rows + 1) * padding) / rows
-    );
-
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const x = padding + col * (appleSize + padding);
-            const y = padding + row * (appleSize + padding);
-            apples.push({
-                x,
-                y,
-                value: Math.floor(Math.random() * 9) + 1,
-                visible: true,
-                size: appleSize
-            });
-        }
-    }
+// ── 레코드 로드 ──
+function loadRecords() {
+  fetch(`${serverUrl}/records`)
+    .then(r=>r.ok? r.json(): Promise.reject())
+    .then(data => {
+      recordList.innerHTML = '';
+      data.sort((a,b)=>b.score-a.score)
+          .forEach(r=>{
+            const d = document.createElement('div');
+            d.className = 'record-item';
+            d.textContent = `${r.name}: ${r.score}점 (${new Date(r.date).toLocaleString()})`;
+            recordList.append(d);
+          });
+    })
+    .catch(_=> recordList.innerHTML = '<div class="record-item">불러올 수 없습니다.</div>');
 }
 
-        function startTimer() {
-            const timerInterval = setInterval(() => {
-                if (!gameStarted) return;
-                timeLeft--;
-                timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
-
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    gameStarted = false;
-                    
-                    fetch('http://localhost:3000/records', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            name: playerName,
-                            score: score
-                        })
-                    }).then(() => {
-                        alert(`게임 종료! 최종 점수: ${score}`);
-                        loadRecords();
-                    });
-                }
-            }, 1000);
-        }
-
-        // 터치 이벤트 핸들러 추가 및 수정
-        function getCanvasPosition(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            
-            // 터치 이벤트인 경우
-            if (e.touches) {
-                return {
-                    x: (e.touches[0].clientX - rect.left) * scaleX,
-                    y: (e.touches[0].clientY - rect.top) * scaleY
-                };
-            }
-            
-            // 마우스 이벤트인 경우
-            return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
-            };
-        }
-
-        // 터치 이벤트 리스너
-        canvas.addEventListener('touchstart', handleStart, { passive: false });
-        canvas.addEventListener('touchmove', handleMove, { passive: false });
-        canvas.addEventListener('touchend', handleEnd, { passive: false });
-        canvas.addEventListener('touchcancel', handleEnd, { passive: false });
-
-        function handleStart(e) {
-            e.preventDefault();
-            if (!gameStarted) return;
-            
-            const pos = getCanvasPosition(e);
-            isDragging = true;
-            dragStartX = pos.x;
-            dragStartY = pos.y;
-            dragEndX = pos.x;
-            dragEndY = pos.y;
-        }
-
-        function handleMove(e) {
-            e.preventDefault();
-            if (!isDragging || !gameStarted) return;
-            
-            const pos = getCanvasPosition(e);
-            dragEndX = pos.x;
-            dragEndY = pos.y;
-            
-            requestAnimationFrame(() => {
-                clearCanvas();
-                drawApples();
-                drawDragBox();
-            });
-        }
-
-        function handleEnd(e) {
-            e.preventDefault();
-            if (!isDragging || !gameStarted) return;
-            
-            const selectedApples = apples.filter(apple => {
-                if (!apple.visible) return false;
-                
-                const boxLeft = Math.min(dragStartX, dragEndX);
-                const boxRight = Math.max(dragStartX, dragEndX);
-                const boxTop = Math.min(dragStartY, dragEndY);
-                const boxBottom = Math.max(dragStartY, dragEndY);
-                
-                const appleCenterX = apple.x + appleSize / 2;
-                const appleCenterY = apple.y + appleSize / 2;
-                
-                return appleCenterX >= boxLeft && appleCenterX <= boxRight &&
-                       appleCenterY >= boxTop && appleCenterY <= boxBottom;
-            });
-            
-            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
-            if (sum === 10) {
-                removeApples(selectedApples);
-            }
-            
-            isDragging = false;
-            dragStartX = undefined;
-            dragStartY = undefined;
-            dragEndX = undefined;
-            dragEndY = undefined;
-            
-            clearCanvas();
-            drawApples();
-        }
-
-        // 마우스 이벤트 핸들러 수정
-        function getCanvasPosition(clientX, clientY) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
-        }
-
-        // mousedown 이벤트 수정
-        canvas.addEventListener('mousedown', (e) => {
-            if (!gameStarted) return;
-            const pos = getCanvasPosition(e.clientX, e.clientY);
-            dragStartX = pos.x;
-            dragStartY = pos.y;
-            dragEndX = pos.x;  // 초기 dragEnd 위치 설정
-            dragEndY = pos.y;
-            isDragging = true;
-        });
-
-        // mousemove 이벤트 수정
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDragging || !gameStarted) return;
-            const pos = getCanvasPosition(e.clientX, e.clientY);
-            dragEndX = pos.x;
-            dragEndY = pos.y;
-        });
-
-        // mouseup 이벤트 수정
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDragging || !gameStarted) return;
-            
-            const selectedApples = apples.filter(apple => {
-                if (!apple.visible) return false;
-                const boxLeft = Math.min(dragStartX, dragEndX);
-                const boxRight = Math.max(dragStartX, dragEndX);
-                const boxTop = Math.min(dragStartY, dragEndY);
-                const boxBottom = Math.max(dragStartY, dragEndY);
-                
-                const appleCenterX = apple.x + appleSize / 2;
-                const appleCenterY = apple.y + appleSize / 2;
-                
-                return appleCenterX >= boxLeft && appleCenterX <= boxRight &&
-                       appleCenterY >= boxTop && appleCenterY <= boxBottom;
-            });
-
-            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
-            if (sum === 10) {
-                removeApples(selectedApples);
-            }
-            
-            isDragging = false;
-            dragStartX = undefined;
-            dragStartY = undefined;
-            dragEndX = undefined;
-            dragEndY = undefined;
-        });
-
-        // mouseleave 이벤트 추가
-        canvas.addEventListener('mouseleave', () => {
-            if (isDragging) {
-                isDragging = false;
-                dragStartX = undefined;
-                dragStartY = undefined;
-                dragEndX = undefined;
-                dragEndY = undefined;
-                clearCanvas();
-                drawApples();
-            }
-        });
-
-        function updateGame() {
-            if (!gameStarted) return;
-            
-            clearCanvas();
-            drawApples();
-            if (isDragging) {
-                drawDragBox();
-            }
-            requestAnimationFrame(updateGame);
-        }
-
-        function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function drawApples() {
-            bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            apples.forEach(apple => {
-                if (apple.visible) {
-                    const centerX = apple.x + appleSize / 2;
-                    const centerY = apple.y + appleSize / 2;
-                    
-                    // 사과 그리기를 최적화
-                    bufferCtx.fillStyle = 'red';
-                    bufferCtx.beginPath();
-                    bufferCtx.arc(centerX, centerY, appleSize/2 - 5, 0, Math.PI * 2);
-                    bufferCtx.fill();
-                    
-                    // 텍스트 그리기 최적화
-                    bufferCtx.fillStyle = 'white';
-                    bufferCtx.font = '16px Arial';
-                    bufferCtx.textAlign = 'center';
-                    bufferCtx.textBaseline = 'middle';
-                    bufferCtx.fillText(apple.value.toString(), centerX, centerY);
-                }
-            });
-            
-            // 버퍼를 메인 캔버스에 한 번에 복사
-            ctx.drawImage(buffer, 0, 0);
-        }
-
-        function calculateSum(selectedApples) {
-            // 선택된 사과들의 값만 더하기
-            return selectedApples.reduce((sum, apple) => {
-                return sum + (apple.visible ? apple.value : 0);
-            }, 0);
-        }
-
-        // drawDragBox 함수 수정
-        function drawDragBox() {
-            if (!isDragging || dragStartX === undefined || dragEndX === undefined) return;
-            
-            ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
-            ctx.fillStyle = 'rgba(0, 0, 255, 0.1)';
-            ctx.lineWidth = 2;
-            
-            const x = Math.min(dragStartX, dragEndX);
-            const y = Math.min(dragStartY, dragEndY);
-            const width = Math.abs(dragEndX - dragStartX);
-            const height = Math.abs(dragEndY - dragStartY);
-            
-            // 드래그 박스가 너무 작은 경우 그리지 않음
-            if (width < 5 || height < 5) return;
-            
-            ctx.fillRect(x, y, width, height);
-            ctx.strokeRect(x, y, width, height);
-            
-            // 선택된 사과들의 합 표시
-            const selectedApples = apples.filter(apple => {
-                if (!apple.visible) return false;
-                const appleCenterX = apple.x + appleSize / 2;
-                const appleCenterY = apple.y + appleSize / 2;
-                
-                return appleCenterX >= x && appleCenterX <= x + width &&
-                       appleCenterY >= y && appleCenterY <= y + height;
-            });
-            
-            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
-            
-            // 합계 표시
-            ctx.fillStyle = sum === 10 ? '#4CAF50' : 'black';
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(`합계: ${sum}`, x + width / 2, y - 5);
-        }
-
-        // 사과 제거 애니메이션 최적화
-        function removeApples(selectedApples) {
-            const ANIMATION_DURATION = 200; // 더 빠른 애니메이션
-            const startTime = performance.now();
-            
-            function animate(currentTime) {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
-                
-                clearCanvas();
-                drawApples();
-                
-                // 선택된 사과 하이라이트 효과
-                selectedApples.forEach(apple => {
-                    const centerX = apple.x + appleSize / 2;
-                    const centerY = apple.y + appleSize / 2;
-                    
-                    ctx.fillStyle = `rgba(255, 0, 0, ${0.3 * (1 - progress)})`;
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, appleSize/2 * (1 - progress/2), 0, Math.PI * 2);
-                    ctx.fill();
-                });
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                } else {
-                    selectedApples.forEach(apple => apple.visible = false);
-                    updateScore(score + selectedApples.length);
-                }
-            }
-            
-            requestAnimationFrame(animate);
-        }
-
-        function updateScore(newScore) {
-            score = newScore;
-            scoreDisplay.textContent = `점수: ${score}`;
-            if (socketConnected) {
-                socket.emit('updateScore', { 
-                    score: score,
-                    name: playerName
-                });
-            }
-        }
-
-        function endGame() {
-            gameStarted = false;
-            if (socketConnected) {
-                socket.emit('endGame', { name: playerName });
-            }
-            fetch('http://localhost:3000/records', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: playerName,
-                    score: score
-                })
-            }).then(() => {
-                alert(`게임 종료! 최종 점수: ${score}`);
-                loadRecords();
-            });
-        }
-
-            startButton.addEventListener('click', () => {
-        if (!gameStarted) {
-            playerName = prompt("사용자 이름을 입력하세요:");
-            if (!playerName) {
-                alert("이름을 입력해야 게임을 시작할 수 있습니다.");
-                return;
-            }
-            
-            gameStarted = true;
-            timeLeft = 120;
-            score = 0;
-            
-            scoreDisplay.textContent = `점수: ${score}`;
-            timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
-            
-            initializeApples();
-            if (socketConnected) {
-                socket.emit('startGame', { 
-                    name: playerName, 
-                    score: 0,
-                    timestamp: Date.now()
-                });
-            }
-            startTimer();
-            updateGame();
-        }
+// ── 플레이어 업데이트 ──
+socket.on('updatePlayers', players => {
+  playerList.innerHTML = '';
+  const arr = Array.isArray(players)? players: Object.values(players);
+  if (!arr.length) {
+    playerList.innerHTML = '<div class="player-item">접속한 플레이어 없음</div>';
+  } else {
+    arr.forEach(p => {
+      const d = document.createElement('div');
+      d.className = 'player-item';
+      if (p.name===playerName) d.classList.add('current-player');
+      d.textContent = `${p.name}: ${p.score}점`;
+      playerList.append(d);
     });
+  }
+});
 
-        window.onload = () => {
-            clearCanvas();
-            loadRecords();
-        };
+// ── 타이머 ──
+let timerId;
+function startTimer() {
+  clearInterval(timerId);
+  timerId = setInterval(()=>{
+    if (!gameStarted) return;
+    timeLeft--;
+    timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
+    if (timeLeft<=0) {
+      clearInterval(timerId);
+      finishGame();
+    }
+  },1000);
+}
 
-        // 터치 이벤트 지원
-        let isTouching = false;
+// ── 게임 시작/종료 토글 ──
+startButton.addEventListener('click', ()=>{
+  if (!gameStarted) {
+    playerName = prompt('사용자 이름을 입력하세요:');
+    if (!playerName) return;
+    gameStarted = true;
+    score = 0; timeLeft = 120;
+    scoreDisplay.textContent = `점수: ${score}`;
+    timerDisplay.textContent = `남은 시간: ${timeLeft}초`;
+    startButton.textContent = '게임 종료';
+    startButton.classList.add('active');
+    initializeApples();
+    if (socketConnected) socket.emit('startGame',{name:playerName,score:0});
+    startTimer();
+    requestAnimationFrame(gameLoop);
+  } else {
+    finishGame();
+  }
+});
 
-        // 터치 이벤트 핸들러 수정
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!gameStarted) return;
-            const touch = e.touches[0];
-            const pos = getCanvasPosition(touch.clientX, touch.clientY);
-            dragStartX = pos.x;
-            dragStartY = pos.y;
-            isDragging = true;
-            isTouching = true;
-        }, { passive: false });
+function finishGame() {
+  gameStarted = false;
+  startButton.textContent = '게임 시작';
+  startButton.classList.remove('active');
+  if (socketConnected) socket.emit('endGame',{name:playerName});
+  // 기록 저장
+  fetch(`${serverUrl}/records`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name:playerName,score})
+  }).then(()=>{
+    alert(`게임 종료! 최종 점수: ${score}`);
+    loadRecords();
+  });
+}
 
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (!isDragging || !gameStarted) return;
-            const touch = e.touches[0];
-            const pos = getCanvasPosition(touch.clientX, touch.clientY);
-            dragEndX = pos.x;
-            dragEndY = pos.y;
-            requestAnimationFrame(() => {
-                clearCanvas();
-                drawApples();
-                drawDragBox();
-            });
-        }, { passive: false });
+// ── 드래그 박스 & 입력 ──
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  let x, y;
+  if (e.touches) {
+    x = (e.touches[0].clientX - rect.left)*scaleX;
+    y = (e.touches[0].clientY - rect.top)*scaleY;
+  } else {
+    x = (e.clientX - rect.left)*scaleX;
+    y = (e.clientY - rect.top)*scaleY;
+  }
+  return {x,y};
+}
 
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (!isDragging || !gameStarted) return;
-            
-            const selectedApples = apples.filter(apple => {
-                if (!apple.visible) return false;
-                return isAppleInBox(apple, {
-                    startX: dragStartX,
-                    startY: dragStartY,
-                    endX: dragEndX,
-                    endY: dragEndY
-                });
-            });
+canvas.addEventListener('mousedown',e=>{
+  if(!gameStarted) return;
+  isDragging = true;
+  const p = getCanvasPos(e);
+  dragStartX = dragEndX = p.x;
+  dragStartY = dragEndY = p.y;
+});
+canvas.addEventListener('mousemove',e=>{
+  if(!isDragging||!gameStarted) return;
+  const p = getCanvasPos(e);
+  dragEndX = p.x; dragEndY = p.y;
+});
+canvas.addEventListener('mouseup',e=>{
+  if(!isDragging||!gameStarted) return;
+  selectApples();
+  isDragging=false;
+});
+canvas.addEventListener('mouseleave', ()=>{ isDragging=false; });
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));
+});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));
+});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mouseup',{clientX:e.changedTouches[0].clientX,clientY:e.changedTouches[0].clientY}));
+});
 
-            const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
-            
-            if (sum === 10) {
-                removeApples(selectedApples);
-            }
-            
-            isDragging = false;
-            isTouching = false;
-            dragStartX = dragStartY = dragEndX = dragEndY = undefined;
-        }, { passive: false });
+// 사과 선택 처리
+function selectApples() {
+  const boxLeft   = Math.min(dragStartX,dragEndX);
+  const boxRight  = Math.max(dragStartX,dragEndX);
+  const boxTop    = Math.min(dragStartY,dragEndY);
+  const boxBottom = Math.max(dragStartY,dragEndY);
+  const picked = apples.filter(a=>{
+    if(!a.visible) return false;
+    const cx = a.x + a.size/2, cy = a.y + a.size/2;
+    return cx>=boxLeft && cx<=boxRight && cy>=boxTop && cy<=boxBottom;
+  });
+  const sum = picked.reduce((s,a)=>s+a.value,0);
+  if (sum===10) removeApples(picked);
+}
 
-        // 터치 취소 처리
-        canvas.addEventListener('touchcancel', (e) => {
-            e.preventDefault();
-            isDragging = false;
-            isTouching = false;
-            dragStartX = dragStartY = dragEndX = dragEndY = undefined;
-            
-            clearCanvas();
-            drawApples();
-        }, { passive: false });
+// ── 사과 초기화 ──
+function initializeApples() {
+  apples = [];
+  const pad = 8;
+  const availW = canvas.width  - pad*(cols+1);
+  const availH = canvas.height - pad*(rows+1);
+  const rawSize = Math.min(availW/cols,availH/rows);
+  const size    = Math.max(0, Math.floor(rawSize*0.9)-1);
+  // 중앙 정렬 오프셋
+  const gridW = cols*size + (cols-1)*pad;
+  const gridH = rows*size + (rows-1)*pad;
+  const offsetX = (canvas.width - gridW)/2;
+  const offsetY = (canvas.height - gridH)/2;
 
-        // 모바일에서 더블탭 줌 방지
-        document.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-        }, { passive: false });
+  for(let r=0; r<rows; r++){
+    for(let c=0; c<cols; c++){
+      apples.push({
+        x:c*(size+pad)+offsetX,
+        y:r*(size+pad)+offsetY,
+        size,
+        value: Math.ceil(Math.random()*9),
+        visible:true
+      });
+    }
+  }
+}
 
-        // 화면 크기 변경 시 캔버스 조정
-        window.addEventListener('resize', () => {
-            if (gameStarted) {
-                clearCanvas();
-                drawApples();
-            }
-        });
+// ── 사과 그리기 ──
+function drawApples() {
+  bufferCtx.clearRect(0,0,canvas.width,canvas.height);
+  apples.forEach(a=>{
+    if(!a.visible) return;
+    const cx = a.x + a.size/2, cy = a.y + a.size/2;
+    // 그라데이션 + 그림자
+    bufferCtx.save();
+    const grad = bufferCtx.createRadialGradient(
+      cx - a.size*0.15, cy - a.size*0.15, a.size*0.2,
+      cx, cy, a.size*0.5
+    );
+    grad.addColorStop(0,'#ff7070');
+    grad.addColorStop(1,'#e00');
+    bufferCtx.fillStyle = grad;
+    bufferCtx.shadowColor = 'rgba(0,0,0,0.2)';
+    bufferCtx.shadowBlur  = 4;
+    bufferCtx.beginPath();
+    bufferCtx.arc(cx,cy,a.size/2,0,Math.PI*2);
+    bufferCtx.fill();
+    bufferCtx.restore();
+
+    // 숫자
+    bufferCtx.save();
+    bufferCtx.fillStyle = '#fff';
+    bufferCtx.shadowColor = 'rgba(0,0,0,0.3)';
+    bufferCtx.shadowBlur  = 2;
+    bufferCtx.font = `bold ${Math.floor(a.size*0.6)}px Arial`;
+    bufferCtx.textAlign = 'center';
+    bufferCtx.textBaseline = 'middle';
+    bufferCtx.fillText(a.value,cx,cy);
+    bufferCtx.restore();
+  });
+  // 버퍼→실제 캔버스
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(buffer,0,0);
+}
+
+// ── 드래그 박스 ──
+function drawDragBox() {
+  if(!isDragging) return;
+  const x = Math.min(dragStartX,dragEndX);
+  const y = Math.min(dragStartY,dragEndY);
+  const w = Math.abs(dragEndX-dragStartX);
+  const h = Math.abs(dragEndY-dragStartY);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,123,255,0.6)';
+  ctx.fillStyle   = 'rgba(0,123,255,0.2)';
+  ctx.lineWidth   = 2;
+  ctx.fillRect(x,y,w,h);
+  ctx.strokeRect(x,y,w,h);
+  ctx.restore();
+}
+
+// ── 사과 제거 애니메이션 ──
+function removeApples(picked) {
+  const D=200, start=performance.now();
+  function anim(t){
+    const p = Math.min((t-start)/D,1);
+    picked.forEach(a=>{
+      const cx=a.x+a.size/2, cy=a.y+a.size/2;
+      ctx.save();
+      ctx.globalAlpha = 1-p;
+      ctx.beginPath();
+      ctx.arc(cx,cy,a.size/2*(1-p/2),0,Math.PI*2);
+      ctx.fillStyle = 'rgba(255,0,0,0.4)';
+      ctx.fill();
+      ctx.restore();
+    });
+    drawApples();
+    if(p<1) requestAnimationFrame(anim);
+    else {
+      picked.forEach(a=>a.visible=false);
+      updateScore(score + picked.length);
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+// ── 점수 갱신 ──
+function updateScore(newScore) {
+  score = newScore;
+  scoreDisplay.textContent = `점수: ${score}`;
+  if(socketConnected) socket.emit('updateScore',{name:playerName,score});
+}
+
+// ── 메인 루프 ──
+function gameLoop() {
+  if (gameStarted) {
+    drawApples();
+    drawDragBox();
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+// 초기 로드
+window.onload = ()=> {
+  initializeApples();
+  drawApples();
+  loadRecords();
+};
