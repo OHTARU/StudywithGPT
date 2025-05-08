@@ -118,18 +118,27 @@ let socketConnected = false;
             });
 
         function initializeApples() {
-            apples.length = 0;
-            for (let row = 0; row < rows; row++) {
-                for (let col = 0; col < cols; col++) {
-                    apples.push({
-                        x: col * appleSize,
-                        y: row * appleSize,
-                        value: Math.floor(Math.random() * 9) + 1,
-                        visible: true
-                    });
-                }
-            }
+    apples.length = 0;
+    const padding = 10;
+    const appleSize = Math.min(
+        (canvas.width - (cols + 1) * padding) / cols,
+        (canvas.height - (rows + 1) * padding) / rows
+    );
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const x = padding + col * (appleSize + padding);
+            const y = padding + row * (appleSize + padding);
+            apples.push({
+                x,
+                y,
+                value: Math.floor(Math.random() * 9) + 1,
+                visible: true,
+                size: appleSize
+            });
         }
+    }
+}
 
         function startTimer() {
             const timerInterval = setInterval(() => {
@@ -141,7 +150,7 @@ let socketConnected = false;
                     clearInterval(timerInterval);
                     gameStarted = false;
                     
-                    fetch(`${serverUrl}/records`, {
+                    fetch('http://localhost:3000/records', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -247,7 +256,7 @@ let socketConnected = false;
         }
 
         // 마우스 이벤트 핸들러 수정
-        function getCanvasPositionFromCoords(clientX, clientY) {
+        function getCanvasPosition(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
@@ -260,7 +269,7 @@ let socketConnected = false;
         // mousedown 이벤트 수정
         canvas.addEventListener('mousedown', (e) => {
             if (!gameStarted) return;
-            const pos = getCanvasPositionFromCoords(e.clientX, e.clientY);
+            const pos = getCanvasPosition(e.clientX, e.clientY);
             dragStartX = pos.x;
             dragStartY = pos.y;
             dragEndX = pos.x;  // 초기 dragEnd 위치 설정
@@ -271,7 +280,7 @@ let socketConnected = false;
         // mousemove 이벤트 수정
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging || !gameStarted) return;
-            const pos = getCanvasPositionFromCoords(e.clientX, e.clientY);
+            const pos = getCanvasPosition(e.clientX, e.clientY);
             dragEndX = pos.x;
             dragEndY = pos.y;
         });
@@ -457,7 +466,7 @@ let socketConnected = false;
             if (socketConnected) {
                 socket.emit('endGame', { name: playerName });
             }
-            fetch(`${serverUrl}/records`, {
+            fetch('http://localhost:3000/records', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -582,15 +591,3 @@ let socketConnected = false;
                 drawApples();
             }
         });
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/service-worker.js')
-                .then(function(reg) {
-                  console.log('Service Worker 등록 성공:', reg.scope);
-                })
-                .catch(function(err) {
-                  console.log('Service Worker 등록 실패:', err);
-                });
-            });
-          }
