@@ -1,101 +1,80 @@
-:root {
-  --bg-dark: #1f1e2e;
-  --bg-panel: #2a293c;
-  --primary: #ff4c4c;
-  --text-light: #f5f5f5;
-  --accent: #5a5cff;
-  --radius: 8px;
-}
-
+/* ─────────────────────────────────────────────────────────── */
+/* 기본 리셋 및 폰트 설정                                    */
+/* ─────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  background: var(--bg-dark);
-  color: var(--text-light);
+html, body {
+  width: 100%; height: 100%;
   font-family: 'Segoe UI', sans-serif;
-  min-height: 100vh;
+  background: #2c2d3b; color: #f1f1f5;
+  overflow: hidden;
 }
 
+/* ─────────────────────────────────────────────────────────── */
+/* 컨테이너 레이아웃                                          */
+/* ─────────────────────────────────────────────────────────── */
 .container {
-  display: flex;
-  height: 100%;
-  padding: 1rem;
-  gap: 1rem;
+  display: flex; width: 100%; height: 100%;
 }
 
-/* — 게임판 영역 — */
-.game-wrapper {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--bg-panel);
-  border-radius: var(--radius);
-  padding: 1rem;
+/* ─────────────────────────────────────────────────────────── */
+/* 사이드바                                                  */
+/* ─────────────────────────────────────────────────────────── */
+aside {
+  width: 260px; background: #1f1f2d;
+  padding: 24px; border-left: 2px solid #44445e;
+  display: flex; flex-direction: column; gap: 20px;
+  overflow-y: auto;
+}
+.panel {
+  background: #1f1f2d;
+  border: 1px solid #44445e;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#startBtn {
+  width: 100%; padding: 10px;
+  background: #5964ff; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 1rem; cursor: pointer;
+  transition: background 0.2s ease;
+}
+#startBtn:hover { background: #4a54e1; }
+
+/* ─────────────────────────────────────────────────────────── */
+/* 메인 게임 영역                                            */
+/* ─────────────────────────────────────────────────────────── */
+main {
+  flex: 1; display: flex;
+  justify-content: center; align-items: center;
+  background: #2c2d3b;
 }
 #gameCanvas {
-  background: #282736;
-  border: 2px solid var(--accent);
-  border-radius: var(--radius);
-  max-width: 100%;
-  height: auto;
-  touch-action: none;
+  background: #1f1f2d;
+  border: 2px solid #44445e;
+  border-radius: 12px;
+  width: 90vw; max-width: 800px;
+  height: auto; display: block;
+  touch-action: none; margin: 0 auto;
 }
 
-/* — 사이드바 — */
-.sidebar {
-  width: 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+/* ─────────────────────────────────────────────────────────── */
+/* 기록/플레이어 리스트                                      */
+/* ─────────────────────────────────────────────────────────── */
+.record-item, .player-item {
+  margin: 6px 0; padding: 8px;
+  border-left: 4px solid #5964ff;
 }
 
-.panel {
-  background: var(--bg-panel);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-}
-
-.controls {
-  text-align: center;
-}
-.controls #score,
-.controls #timer {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-.controls button {
-  width: 100%;
-  padding: 0.5rem;
-  font-size: 1rem;
-  color: var(--text-light);
-  background: var(--accent);
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.controls button:active {
-  background: #4342a5;
-}
-
-.records h3,
-.players h3 {
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-}
-#recordList,
-#playerList {
-  max-height: 200px;
-  overflow-y: auto;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-/* — 반응형 — */
-@media (max-width: 768px) {
+/* ─────────────────────────────────────────────────────────── */
+/* 반응형: 화면 너비 800px 이하일 때                         */
+/* ─────────────────────────────────────────────────────────── */
+@media (max-width: 800px) {
   .container { flex-direction: column; }
-  .sidebar { width: 100%; order: 2; }
-  .game-wrapper { order: 1; }
+  aside {
+    width: 100%; border-left: none;
+    border-top: 2px solid #44445e;
+  }
+  main { order: 0; }
+  #gameCanvas { max-width: none; width: 100%; }
 }
